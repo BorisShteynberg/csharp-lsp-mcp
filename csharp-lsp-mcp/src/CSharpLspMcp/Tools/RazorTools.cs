@@ -11,6 +11,17 @@ public class RazorTools(RazorClient razorClient, ILogger<RazorTools> logger)
 {
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromMinutes(3);
 
+    [McpServerTool(Name = "razor_stop")]
+    [Description("Stops the Razor language server, releasing file locks. Call this before rebuilding the project.")]
+    public Task<string> StopAsync(CancellationToken cancellationToken)
+    {
+        return ExecuteToolAsync("razor_stop", async ct =>
+        {
+            await razorClient.StopAsync();
+            return "Razor language server stopped.";
+        }, cancellationToken);
+    }
+
     [McpServerTool(Name = "razor_diagnostics")]
     [Description("Get compiler diagnostics for a Razor (.cshtml) file.")]
     public Task<string> GetDiagnosticsAsync(
@@ -94,8 +105,15 @@ public class RazorTools(RazorClient razorClient, ILogger<RazorTools> logger)
         var dir = Path.GetDirectoryName(filePath);
         while (dir != null)
         {
-            if (Directory.GetFiles(dir, "*.csproj").Length > 0)
-                return dir;
+            try
+            {
+                if (Directory.GetFiles(dir, "*.csproj").Length > 0)
+                    return dir;
+            }
+            catch (Exception)
+            {
+                // directory not accessible — keep walking up
+            }
             dir = Path.GetDirectoryName(dir);
         }
         return null;

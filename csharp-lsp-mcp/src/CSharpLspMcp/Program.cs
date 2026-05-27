@@ -138,6 +138,7 @@ AVAILABLE TOOLS:
     xaml_extract_viewmodel   - Generate ViewModel from bindings
 
   Razor Tools (require rzls):
+    razor_stop            - Stop the Razor language server to release file locks
     razor_diagnostics     - Get compiler diagnostics for a Razor (.cshtml) file
     razor_definition      - Go to definition from a position in a Razor (.cshtml) file
 ");

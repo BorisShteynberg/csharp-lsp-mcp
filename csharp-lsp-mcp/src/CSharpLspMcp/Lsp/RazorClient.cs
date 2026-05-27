@@ -49,6 +49,14 @@ public class RazorClient : LspProcessClient
         await _initLock.WaitAsync(cancellationToken);
         try
         {
+            // If previously started but process has since crashed, reset so we can restart
+            if (_isInitialized && _lspProcess != null && _lspProcess.HasExited)
+            {
+                _logger.LogWarning("rzls process exited unexpectedly, restarting...");
+                await ShutdownProcessAsync();
+                _openDocuments.Clear();
+            }
+
             if (_isInitialized)
                 return true;
 
