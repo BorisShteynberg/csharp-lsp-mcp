@@ -40,7 +40,7 @@ public class LspClientTests
     {
         var logger = LoggerFactory.Create(_ => { }).CreateLogger<LspClient>();
         var filter = new SolutionFilter(LoggerFactory.Create(_ => { }).CreateLogger<SolutionFilter>());
-        await using var client = new LspClient(logger, filter);
+        var client = new LspClient(logger, filter);
 
         await client.DisposeAsync(); // first call
         await client.DisposeAsync(); // second call — must not throw
