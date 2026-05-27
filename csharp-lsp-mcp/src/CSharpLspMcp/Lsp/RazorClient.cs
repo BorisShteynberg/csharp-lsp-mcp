@@ -243,7 +243,8 @@ public class RazorClient : LspProcessClient
             var output = await proc.StandardOutput.ReadToEndAsync(cancellationToken);
             await proc.WaitForExitAsync(cancellationToken);
 
-            foreach (var (version, root) in ParseSdkList(output).OrderByDescending(s => s.Version))
+            foreach (var (version, root) in ParseSdkList(output)
+                .OrderByDescending(s => Version.TryParse(s.Version, out var v) ? v : new Version(0, 0)))
             {
                 var major = version.Split('.')[0];
                 var rzlsPath = Path.Combine(root, version, "DotnetTools", "dotnet-razor",
