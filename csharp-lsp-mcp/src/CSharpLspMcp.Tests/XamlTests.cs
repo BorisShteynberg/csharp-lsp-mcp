@@ -135,7 +135,7 @@ public class XamlParserTests
 public class XamlAnalyzerTests
 {
     [Fact]
-    public async Task Analyze_EmptyBindingPath_ProducesInfoDiagnostic()
+    public async Task Analyze_EmptyBindingPath_ProducesInfoDiagnosticAsync()
     {
         var logger = LoggerFactory.Create(_ => { }).CreateLogger<XamlAnalyzer>();
         var analyzer = new XamlAnalyzer(logger);

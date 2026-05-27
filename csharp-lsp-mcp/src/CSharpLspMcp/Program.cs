@@ -75,7 +75,7 @@ public class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Server crashed: {ex.Message}");
+            await Console.Error.WriteLineAsync($"Server crashed: {ex.Message}");
             return 1;
         }
     }

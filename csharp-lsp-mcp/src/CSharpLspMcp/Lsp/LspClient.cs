@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace CSharpLspMcp.Lsp;
 
@@ -53,7 +54,10 @@ public class LspClient : IAsyncDisposable
 
             _logger.LogInformation("Stopping LSP server...");
 
-            _readLoopCts?.Cancel();
+           if (_readLoopCts != null)
+           {
+               await _readLoopCts.CancelAsync();
+           }
 
             if (_readLoopTask != null)
             {
@@ -274,13 +278,13 @@ public class LspClient : IAsyncDisposable
                         CompletionItem = new CompletionItemCapabilities
                         {
                             SnippetSupport = true,
-                            DocumentationFormat = new[] { "markdown", "plaintext" }
+                            DocumentationFormat = ["markdown", "plaintext"]
                         }
                     },
                     Hover = new HoverClientCapabilities
                     {
                         DynamicRegistration = false,
-                        ContentFormat = new[] { "markdown", "plaintext" }
+                        ContentFormat = ["markdown", "plaintext"]
                     },
                     PublishDiagnostics = new PublishDiagnosticsClientCapabilities
                     {
@@ -293,7 +297,7 @@ public class LspClient : IAsyncDisposable
                 }
             },
             WorkspaceFolders = workspacePath != null
-                ? new[] { new WorkspaceFolder { Uri = rootUri!, Name = Path.GetFileName(workspacePath) } }
+                ? [ new WorkspaceFolder { Uri = rootUri!, Name = Path.GetFileName(workspacePath) } ]
                 : null
         };
 
@@ -331,7 +335,7 @@ public class LspClient : IAsyncDisposable
                 Uri = uri,
                 Version = version
             },
-            ContentChanges = new[] { new TextDocumentContentChangeEvent { Text = content } }
+            ContentChanges = [ new TextDocumentContentChangeEvent { Text = content } ]
         };
 
         await SendNotificationAsync("textDocument/didChange", param, cancellationToken);
@@ -423,7 +427,7 @@ public class LspClient : IAsyncDisposable
             return result.Deserialize<Location[]>(JsonOptions);
 
         var single = result.Deserialize<Location>(JsonOptions);
-        return single != null ? new[] { single } : null;
+        return single != null ? [single] : null;
     }
 
     public async Task<Location[]?> GetReferencesAsync(string filePath, int line, int character, bool includeDeclaration = true, CancellationToken cancellationToken = default)
@@ -689,16 +693,17 @@ public class LspClient : IAsyncDisposable
         }
 
         var headerText = Encoding.ASCII.GetString(headerBytes.ToArray()).TrimEnd('\r', '\n');
-        var lines = headerText.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
-
-        foreach (var line in lines)
-        {
-            if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
+        
+        var lines = headerText.Split(["\r\n"], StringSplitOptions.RemoveEmptyEntries);
+        
+        int length =0;
+        foreach (var _ in from line in lines
+                          where line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)
+                          where int.TryParse(line.Substring(15).Trim(), out  length)
+                          select new { })
             {
-                if (int.TryParse(line.Substring(15).Trim(), out var length))
-                    return length;
+            return length;
             }
-        }
 
         return 0;
     }
@@ -719,8 +724,10 @@ public class LspClient : IAsyncDisposable
 
     private async Task CleanupFailedStartAsync()
     {
-        _readLoopCts?.Cancel();
-
+        if (_readLoopCts != null)
+            {
+            await (_readLoopCts.CancelAsync()).ConfigureAwait(true);
+            }
         if (_readLoopTask != null)
         {
             try
@@ -750,7 +757,10 @@ public class LspClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _readLoopCts?.Cancel();
+        if (_readLoopCts != null)
+        {
+            await _readLoopCts.CancelAsync();
+        }
 
         if (_readLoopTask != null)
         {
