@@ -65,7 +65,7 @@ public class RazorTools(RazorClient razorClient, ILogger<RazorTools> logger)
 
             var locations = await razorClient.GetDefinitionAsync(filePath, line, character, ct);
             if (locations == null || locations.Length == 0)
-                return "null";
+                return "No definition found.";
 
             var loc = locations[0];
             return JsonSerializer.Serialize(new
