@@ -78,14 +78,26 @@ Extends `LspProcessClient`. Manages the `rzls` process lifecycle and exposes two
 
 Workspace is always auto-discovered from the `filePath` argument: walk up the directory tree from the file until a `.csproj` is found, use its parent directory as the project root. `RazorClient` does not share state with `CSharpTools` or `LspClient`.
 
+### Document Versioning
+
+`RazorClient` maintains a `_openDocuments` dictionary mapping `filePath → version` (same pattern as `CSharpTools`). This drives the open/change/close lifecycle:
+
+- **First call for a file:** send `textDocument/didOpen` with `version = 1`.
+- **Subsequent calls with new content:** send `textDocument/didChange` with an incremented version. Do NOT re-send `didOpen` — rzls treats a second `didOpen` for an already-open URI as a protocol error.
+- **Content unchanged:** if the caller passes the same content (or omits content and the file on disk is unchanged), skip the notification entirely and let rzls use its cached state.
+- **`StopAsync`:** sends `textDocument/didClose` for every tracked document before shutting down, then clears `_openDocuments`.
+
+Version numbers are per-document integers incremented on each `didChange`. They do not need to stay in sync with `LspClient`'s document versions — the two clients track independent sets of open files.
+
 ### Operations
 
 **`GetDiagnosticsAsync(filePath, content, cancellationToken)`**
-- Sends `textDocument/didOpen` with file content (reads from disk if `content` is null).
+- Opens or updates the document via the versioning rules above.
 - Waits up to 10 seconds for a `textDocument/publishDiagnostics` notification.
 - Returns diagnostics received by the deadline (empty list if none arrive — not an error).
 
 **`GetDefinitionAsync(filePath, line, character, cancellationToken)`**
+- Opens or updates the document via the versioning rules above.
 - Sends `textDocument/definition` request.
 - Returns `Location[]` or null if rzls returns no result.
 
