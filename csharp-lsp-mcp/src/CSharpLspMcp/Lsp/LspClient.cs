@@ -23,6 +23,7 @@ public class LspClient : IAsyncDisposable
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private string? _filteredWorkspacePath;
+    private int _disposed;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -757,37 +758,14 @@ public class LspClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_readLoopCts != null)
-        {
-            await _readLoopCts.CancelAsync();
-        }
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
 
-        if (_readLoopTask != null)
-        {
-            try
-            {
-                await _readLoopTask.WaitAsync(TimeSpan.FromSeconds(5));
-            }
-            catch { }
-        }
-
-        if (_lspProcess != null && !_lspProcess.HasExited)
-        {
-            try
-            {
-                // Send shutdown request
-                await SendRequestAsync<object>("shutdown", null, CancellationToken.None);
-                await SendNotificationAsync("exit", null, CancellationToken.None);
-
-                if (!_lspProcess.WaitForExit(3000))
-                    _lspProcess.Kill();
-            }
-            catch { }
-        }
-
-        _lspProcess?.Dispose();
-        _readLoopCts?.Dispose();
-        _initLock.Dispose();
-        _writeLock.Dispose();
+        // Delegate to StopAsync: it acquires _initLock, performs the full
+        // orderly shutdown, and resets all state. This prevents disposing
+        // _initLock/_writeLock while a concurrent StopAsync is blocked on
+        // WaitAsync(). The semaphores are not disposed here because they hold
+        // no unmanaged resources (AvailableWaitHandle is never used).
+        await StopAsync();
     }
 }
