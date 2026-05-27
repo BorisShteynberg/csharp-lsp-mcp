@@ -48,6 +48,7 @@ public class Program
             // Register solution filter and LSP client as singletons
             builder.Services.AddSingleton<SolutionFilter>();
             builder.Services.AddSingleton<LspClient>();
+            builder.Services.AddSingleton<RazorClient>();
 
             // Configure MCP server with official SDK
             builder.Services
@@ -61,7 +62,8 @@ public class Program
                 })
                 .WithStdioServerTransport()
                 .WithTools<CSharpTools>()
-                .WithTools<XamlTools>();
+                .WithTools<XamlTools>()
+                .WithTools<RazorTools>();
 
             var app = builder.Build();
 
