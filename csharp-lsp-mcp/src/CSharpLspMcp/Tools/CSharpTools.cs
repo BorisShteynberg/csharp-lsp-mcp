@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using CSharpLspMcp.Lsp;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
@@ -16,6 +17,7 @@ public class CSharpTools
     private readonly ILogger<CSharpTools> _logger;
     private readonly LspClient _lspClient;
     private readonly RazorClient _razorClient;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly Dictionary<string, DocumentState> _openDocuments = new();
     private string? _workspacePath;
 
@@ -23,11 +25,12 @@ public class CSharpTools
     // This prevents MCP request cancellation from killing LSP initialization
     private static readonly TimeSpan LspOperationTimeout = TimeSpan.FromMinutes(3);
 
-    public CSharpTools(ILogger<CSharpTools> logger, LspClient lspClient, RazorClient razorClient)
+    public CSharpTools(ILogger<CSharpTools> logger, LspClient lspClient, RazorClient razorClient, IHostApplicationLifetime lifetime)
     {
         _logger = logger;
         _lspClient = lspClient;
         _razorClient = razorClient;
+        _lifetime = lifetime;
     }
 
     /// <summary>
@@ -108,6 +111,26 @@ public class CSharpTools
 
             return "LSP server stopped. File locks released.\nCall csharp_set_workspace to restart when ready.";
         }, cancellationToken);
+    }
+
+    [McpServerTool(Name = "mcp_stop")]
+    [Description("Shut down the csharp-lsp-mcp server process, releasing all file locks (including the server DLL itself). Use this before rebuilding csharp-lsp-mcp from source. Reconnect via /mcp after rebuilding.")]
+    public async Task<string> StopServerAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("mcp_stop called — stopping all LSP servers and shutting down host");
+
+        try { await _lspClient.StopAsync(); } catch { }
+        try { await _razorClient.StopAsync(); } catch { }
+        _openDocuments.Clear();
+
+        // Schedule host shutdown after a short delay so the response can be sent first
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(500);
+            _lifetime.StopApplication();
+        });
+
+        return "Shutting down csharp-lsp-mcp. Reconnect via /mcp after rebuilding.";
     }
 
     [McpServerTool(Name = "csharp_diagnostics")]

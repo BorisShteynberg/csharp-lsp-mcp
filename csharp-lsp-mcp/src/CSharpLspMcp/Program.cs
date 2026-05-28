@@ -127,6 +127,7 @@ AVAILABLE TOOLS:
     csharp_symbols        - Get document symbols
     csharp_code_actions   - Get available code actions
     csharp_rename         - Preview symbol rename
+    mcp_stop              - Shut down this server (use before rebuilding csharp-lsp-mcp)
 
   XAML Tools (built-in):
     xaml_validate         - Validate XAML for errors and issues
