@@ -123,11 +123,15 @@ public class CSharpTools
         try { await _razorClient.StopAsync(); } catch { }
         _openDocuments.Clear();
 
-        // Schedule host shutdown after a short delay so the response can be sent first
+        // Schedule shutdown after a short delay so the response can be sent first.
+        // StopApplication signals graceful shutdown; Environment.Exit is the fallback
+        // if the MCP SDK keeps the stdio pipe open and prevents the host from exiting.
         _ = Task.Run(async () =>
         {
             await Task.Delay(500);
             _lifetime.StopApplication();
+            await Task.Delay(2000);
+            Environment.Exit(0);
         });
 
         return "Shutting down csharp-lsp-mcp. Reconnect via /mcp after rebuilding.";
