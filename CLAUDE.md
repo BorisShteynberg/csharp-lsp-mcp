@@ -61,7 +61,7 @@ xUnit + Moq. Tests cover LSP stream-reading (content-length framing), protocol t
 
 - **MCP protocol on stdout**: all logging must go to stderr. Don't add `Console.WriteLine` to tool code.
 - **Nullable reference types** are enabled project-wide (`<Nullable>enable</Nullable>`).
-- **LSP file locks**: after `csharp-ls` or Roslyn LS starts, they hold locks on compiled DLLs. Call `csharp_stop` or `razor_stop` before rebuilding. Because the DLL for this MCP server itself is locked by the running process, rebuilding requires killing the MCP server process first.
+- **LSP file locks**: after `csharp-ls` or Roslyn LS starts, they hold locks on compiled DLLs. Call `csharp_stop` or `razor_stop` before rebuilding. The `mcp_stop` tool stops all LSP child processes and shuts down the host, but Claude Code auto-restarts the server immediately — so to rebuild `csharp-lsp-mcp` itself, disconnect via `/mcp` first, build, then reconnect.
 - **MCP SDK version**: uses `ModelContextProtocol` `0.5.0-preview.1` — a pre-release SDK with an evolving API surface.
 - **Roslyn LS requires `--stdio`**: `Microsoft.CodeAnalysis.LanguageServer` version 2.x requires the `--stdio` flag to use stdin/stdout transport. Omitting it causes the process to exit immediately.
 - **Eager Razor startup**: `csharp_set_workspace` fires `RazorClient.StartAsync` as a fire-and-forget background task. Roslyn LS can take 30–60 seconds to initialize a solution; starting it early avoids timeouts on the first `razor_diagnostics` call.

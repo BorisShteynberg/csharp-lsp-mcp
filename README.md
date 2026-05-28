@@ -121,13 +121,15 @@ This starts `csharp-ls` for C# tooling and kicks off the Roslyn Language Server 
 
 ### Stopping the LSP for Rebuilds
 
-The LSP server holds file locks on project DLLs. Stop it before rebuilding:
+The LSP server holds file locks on project DLLs. Stop it before rebuilding your project:
 
 ```
 Stop the C# LSP server so I can rebuild
 ```
 
 After rebuilding, call `csharp_set_workspace` again to restart.
+
+To stop all LSP servers and shut down the MCP server process itself (e.g. to rebuild `csharp-lsp-mcp` from source), use `mcp_stop`. Note that Claude Code will auto-restart the server, so disconnect via `/mcp` first if you need the DLL unlocked for a build.
 
 ### Example Interactions
 
@@ -145,6 +147,7 @@ Get diagnostics for Pages/Index.cshtml
 |------|-------------|
 | `csharp_set_workspace` | Set the solution/project directory |
 | `csharp_stop` | Stop the C# LSP server to release file locks |
+| `mcp_stop` | Stop all LSP child processes and shut down the server |
 | `csharp_diagnostics` | Get compiler errors and warnings |
 | `csharp_hover` | Get type info at a position |
 | `csharp_completions` | Get IntelliSense completions |

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `razor_diagnostics` — compiler errors and warnings for `.cshtml` files
   - `razor_definition` — go to definition from a Razor file position
   - `razor_stop` — stop the Razor language server to release file locks
+- `mcp_stop` tool — stops all LSP child processes (csharp-ls and Roslyn LS) and shuts down the server process; useful for releasing workspace file locks. Note: Claude Code auto-restarts the server, so use `/mcp` disconnect to unlock the server DLL for a source rebuild
 - `add-to-project.ps1` — PowerShell script to register csharp-lsp-mcp with a Claude Code project by editing `~/.claude.json`; uses the global tool if installed, falls back to the local debug build
 - `csharp_set_workspace` now starts the Roslyn Language Server in the background so Razor tools are ready without extra warm-up time
 - `LspClient.WorkspacePath` property so Razor tools reuse the same filtered solution workspace
