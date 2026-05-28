@@ -114,7 +114,7 @@ public class CSharpTools
     }
 
     [McpServerTool(Name = "mcp_stop")]
-    [Description("Shut down the csharp-lsp-mcp server process, releasing all file locks (including the server DLL itself). Use this before rebuilding csharp-lsp-mcp from source. Reconnect via /mcp after rebuilding.")]
+    [Description("Stop all LSP child processes (csharp-ls and Roslyn LS) and shut down the server. Useful for releasing workspace file locks. Note: Claude Code will auto-restart the server immediately, so to rebuild csharp-lsp-mcp itself you must disconnect via /mcp first, then build, then reconnect.")]
     public async Task<string> StopServerAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("mcp_stop called — stopping all LSP servers and shutting down host");
