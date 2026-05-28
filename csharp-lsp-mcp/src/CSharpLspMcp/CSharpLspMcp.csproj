@@ -10,15 +10,15 @@
 
     <!-- NuGet Package Properties -->
     <PackageId>CSharpLspMcp</PackageId>
-    <Version>1.0.0</Version>
-    <Authors>HYMMA</Authors>
-    <Company>HYMMA</Company>
+    <Version>1.1.0</Version>
+    <Authors>BorisShteynberg</Authors>
+    <Company>BorisShteynberg</Company>
     <Product>csharp-lsp-mcp</Product>
-    <Description>MCP (Model Context Protocol) server providing C# and XAML language intelligence for AI assistants like Claude. Exposes IntelliSense, diagnostics, and code analysis through the standardized MCP protocol.</Description>
-    <PackageTags>mcp;csharp;dotnet;language-server;claude;ai;xaml;intellisense;roslyn;model-context-protocol</PackageTags>
+    <Description>MCP (Model Context Protocol) server providing C#, Razor, and XAML language intelligence for AI assistants like Claude. Exposes IntelliSense, diagnostics, go-to-definition, and code analysis through the standardized MCP protocol.</Description>
+    <PackageTags>mcp;csharp;dotnet;language-server;claude;ai;xaml;razor;intellisense;roslyn;model-context-protocol</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/HYMMA/csharp-lsp-mcp</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/HYMMA/csharp-lsp-mcp.git</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/BorisShteynberg/csharp-lsp-mcp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/BorisShteynberg/csharp-lsp-mcp.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
@@ -31,6 +31,7 @@
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
