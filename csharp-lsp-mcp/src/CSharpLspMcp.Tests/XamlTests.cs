@@ -113,7 +113,7 @@ public class XamlParserTests
 
         var button = result.Root?.Children.FirstOrDefault();
         Assert.NotNull(button);
-        var attached = button.Attributes.FirstOrDefault(a => a.Name.Contains("."));
+        var attached = button.Attributes.FirstOrDefault(a => a.Name.Contains('.'));
         Assert.NotNull(attached);
         Assert.True(attached.IsAttached);
         Assert.Equal("Grid", attached.OwnerType);

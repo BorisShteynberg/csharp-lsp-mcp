@@ -4,87 +4,83 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
-using ModelContextProtocol.Server;
+using System.Reflection;
 
-namespace CSharpLspMcp;
-
-public class Program
-{
-    public static async Task<int> Main(string[] args)
+// Handle version flag
+if (args.Contains("--version") || args.Contains("-v"))
     {
-        // Handle version flag
-        if (args.Contains("--version") || args.Contains("-v"))
-        {
-            Console.WriteLine("csharp-lsp-mcp version 1.0.0");
-            return 0;
-        }
-
-        // Handle help flag
-        if (args.Contains("--help") || args.Contains("-h"))
-        {
-            PrintHelp();
-            return 0;
-        }
-
-        try
-        {
-            var builder = Host.CreateApplicationBuilder(args);
-
-            // Configure logging to stderr so it doesn't interfere with MCP protocol
-            builder.Logging.AddConsole(options =>
-            {
-                options.LogToStandardErrorThreshold = LogLevel.Trace;
-            });
-
-            // Set log level based on environment or args
-            var logLevel = LogLevel.Warning;
-            if (args.Contains("--verbose") || args.Contains("-V"))
-                logLevel = LogLevel.Debug;
-            if (Environment.GetEnvironmentVariable("MCP_DEBUG") == "1")
-                logLevel = LogLevel.Trace;
-
-            builder.Logging.SetMinimumLevel(logLevel);
-
-            // Register solution filter and LSP client as singletons
-            builder.Services.AddSingleton<SolutionFilter>();
-            builder.Services.AddSingleton<LspClient>();
-            builder.Services.AddSingleton<RazorClient>();
-
-            // Configure MCP server with official SDK
-            builder.Services
-                .AddMcpServer(options =>
-                {
-                    options.ServerInfo = new Implementation
-                    {
-                        Name = "csharp-lsp-mcp",
-                        Version = "1.0.0"
-                    };
-                })
-                .WithStdioServerTransport()
-                .WithTools<CSharpTools>()
-                .WithTools<XamlTools>()
-                .WithTools<RazorTools>();
-
-            var app = builder.Build();
-
-            await app.RunAsync();
-
-            return 0;
-        }
-        catch (OperationCanceledException)
-        {
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            await Console.Error.WriteLineAsync($"Server crashed: {ex.Message}");
-            return 1;
-        }
+    var infoVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+  
+    Console.WriteLine($"csharp-lsp-mcp {infoVersion}");
+    
+    return 0;
     }
 
-    private static void PrintHelp()
+// Handle help flag
+if (args.Contains("--help") || args.Contains("-h"))
     {
-        Console.WriteLine(@"csharp-lsp-mcp - MCP Server for C# and XAML Language Intelligence
+    PrintHelp();
+    return 0;
+    }
+
+try
+    {
+    var builder = Host.CreateApplicationBuilder(args);
+
+    // Configure logging to stderr so it doesn't interfere with MCP protocol
+    builder.Logging.AddConsole(options =>
+    {
+        options.LogToStandardErrorThreshold = LogLevel.Trace;
+    });
+
+    // Set log level based on environment or args
+    var logLevel = LogLevel.Warning;
+    if (args.Contains("--verbose") || args.Contains("-V"))
+        logLevel = LogLevel.Debug;
+    if (Environment.GetEnvironmentVariable("MCP_DEBUG") == "1")
+        logLevel = LogLevel.Trace;
+
+    builder.Logging.SetMinimumLevel(logLevel);
+
+    // Register solution filter and LSP client as singletons
+    builder.Services.AddSingleton<SolutionFilter>();
+    builder.Services.AddSingleton<LspClient>();
+    builder.Services.AddSingleton<RazorClient>();
+
+    // Configure MCP server with official SDK
+    builder.Services
+        .AddMcpServer(options =>
+        {
+            options.ServerInfo = new Implementation
+                {
+                Name = "csharp-lsp-mcp",
+                Version = "1.1.0"
+                };
+        })
+        .WithStdioServerTransport()
+        .WithTools<CSharpTools>()
+        .WithTools<XamlTools>()
+        .WithTools<RazorTools>();
+
+    var app = builder.Build();
+
+    await app.RunAsync();
+
+    return 0;
+    }
+catch (OperationCanceledException)
+    {
+    return 0;
+    }
+catch (Exception ex)
+    {
+    await Console.Error.WriteLineAsync($"Server crashed: {ex.Message}");
+    return 1;
+    }
+
+static void PrintHelp()
+    {
+    Console.WriteLine(@"csharp-lsp-mcp - MCP Server for C# and XAML Language Intelligence
 
 USAGE:
     csharp-lsp-mcp [OPTIONS]
@@ -138,10 +134,9 @@ AVAILABLE TOOLS:
     xaml_find_binding_errors - Find binding errors
     xaml_extract_viewmodel   - Generate ViewModel from bindings
 
-  Razor Tools (require rzls):
+  Razor Tools (require VS Code C# extension):
     razor_stop            - Stop the Razor language server to release file locks
     razor_diagnostics     - Get compiler diagnostics for a Razor (.cshtml) file
     razor_definition      - Go to definition from a position in a Razor (.cshtml) file
 ");
     }
-}

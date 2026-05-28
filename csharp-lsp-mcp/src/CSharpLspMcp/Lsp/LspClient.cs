@@ -5,20 +5,14 @@ using Microsoft.Extensions.Logging;
 
 namespace CSharpLspMcp.Lsp;
 
-public class LspClient : LspProcessClient
+public class LspClient(ILogger<LspClient> logger, SolutionFilter solutionFilter) : LspProcessClient(logger)
 {
-    private readonly SolutionFilter _solutionFilter;
     private readonly ConcurrentDictionary<string, PublishDiagnosticsParams> _diagnosticsCache = new();
     private string? _filteredWorkspacePath;
 
     public event Action<PublishDiagnosticsParams>? DiagnosticsReceived;
 
     public string? WorkspacePath => _filteredWorkspacePath;
-
-    public LspClient(ILogger<LspClient> logger, SolutionFilter solutionFilter) : base(logger)
-    {
-        _solutionFilter = solutionFilter;
-    }
 
     /// <summary>
     /// Stops the LSP server and resets state so it can be restarted with StartAsync.
@@ -35,7 +29,7 @@ public class LspClient : LspProcessClient
             await ShutdownProcessAsync();
             _filteredWorkspacePath = null;
             _diagnosticsCache.Clear();
-            _solutionFilter.Cleanup();
+            solutionFilter.Cleanup();
             _logger.LogInformation("LSP server stopped.");
         }
         finally
@@ -64,7 +58,7 @@ public class LspClient : LspProcessClient
             var effectiveWorkspacePath = workspacePath;
             if (workspacePath != null)
             {
-                _filteredWorkspacePath = _solutionFilter.GetFilteredWorkspacePath(workspacePath);
+                _filteredWorkspacePath = solutionFilter.GetFilteredWorkspacePath(workspacePath);
                 if (_filteredWorkspacePath != workspacePath)
                 {
                     _logger.LogInformation("Using filtered workspace: {Path}", _filteredWorkspacePath);
@@ -144,7 +138,7 @@ public class LspClient : LspProcessClient
         }
     }
 
-    private async Task<string?> FindLspServerAsync(CancellationToken cancellationToken)
+    private static  async Task<string?> FindLspServerAsync(CancellationToken cancellationToken)
     {
         // Check common locations for csharp-ls
         var isWindows = OperatingSystem.IsWindows();
