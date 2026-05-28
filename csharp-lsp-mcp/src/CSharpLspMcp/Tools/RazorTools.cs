@@ -40,7 +40,7 @@ public class RazorTools(RazorClient razorClient, ILogger<RazorTools> logger)
             }
 
             if (!await EnsureStartedAsync(filePath, ct))
-                return "Error: rzls not found — install .NET SDK 8.0.3+ or the VS Code C# extension.";
+                return "Error: Razor language server not available. Install the VS Code C# extension (ms-dotnettools.csharp).";
 
             var result = await razorClient.GetDiagnosticsAsync(filePath, resolvedContent, ct);
             if (result == null || result.Diagnostics.Length == 0)
@@ -72,7 +72,7 @@ public class RazorTools(RazorClient razorClient, ILogger<RazorTools> logger)
                 return $"Error: File not found: {filePath}";
 
             if (!await EnsureStartedAsync(filePath, ct))
-                return "Error: rzls not found — install .NET SDK 8.0.3+ or the VS Code C# extension.";
+                return "Error: Razor language server not available. Install the VS Code C# extension (ms-dotnettools.csharp).";
 
             var locations = await razorClient.GetDefinitionAsync(filePath, line, character, ct);
             if (locations == null || locations.Length == 0)

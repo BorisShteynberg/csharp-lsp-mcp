@@ -8,6 +8,8 @@ namespace CSharpLspMcp.Lsp;
 
 public class RazorClient : LspProcessClient
 {
+    protected record RoslynServerInfo(string LsPath, string RazorExtPath);
+
     private readonly ConcurrentDictionary<string, int> _openDocuments = new();
     private readonly ConcurrentDictionary<string, TaskCompletionSource<PublishDiagnosticsParams?>> _diagnosticsWaiters = new();
 
@@ -49,10 +51,9 @@ public class RazorClient : LspProcessClient
         await _initLock.WaitAsync(cancellationToken);
         try
         {
-            // If previously started but process has since crashed, reset so we can restart
             if (_isInitialized && _lspProcess != null && _lspProcess.HasExited)
             {
-                _logger.LogWarning("rzls process exited unexpectedly, restarting...");
+                _logger.LogWarning("Roslyn LS process exited unexpectedly, restarting...");
                 await ShutdownProcessAsync();
                 _openDocuments.Clear();
             }
@@ -60,42 +61,51 @@ public class RazorClient : LspProcessClient
             if (_isInitialized)
                 return true;
 
-            var rzlsPath = await FindRazorServerAsync(cancellationToken);
-            if (rzlsPath == null)
+            var serverInfo = await FindRoslynServerAsync(cancellationToken);
+            if (serverInfo == null)
             {
-                _logger.LogError("rzls not found — install .NET SDK 8.0.3+ or the VS Code C# extension.");
+                _logger.LogError("Could not find Microsoft.CodeAnalysis.LanguageServer. Install the VS Code C# extension (ms-dotnettools.csharp).");
                 return false;
             }
 
+            _logger.LogInformation("Starting Roslyn language server: {Path}", serverInfo.LsPath);
+
             var startInfo = new ProcessStartInfo
             {
-                FileName = rzlsPath,
+                FileName = serverInfo.LsPath,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-                CreateNoWindow = true
+                CreateNoWindow = true,
             };
+            startInfo.ArgumentList.Add("--extension");
+            startInfo.ArgumentList.Add(serverInfo.RazorExtPath);
+            startInfo.ArgumentList.Add("--logLevel");
+            startInfo.ArgumentList.Add("Warning");
+            startInfo.ArgumentList.Add("--clientProcessId");
+            startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
 
             _lspProcess = new Process { StartInfo = startInfo };
             _lspProcess.ErrorDataReceived += (_, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data))
-                    _logger.LogWarning("rzls stderr: {Message}", e.Data);
+                    _logger.LogDebug("Roslyn LS stderr: {Message}", e.Data);
             };
 
             if (!_lspProcess.Start())
             {
-                _logger.LogError("Failed to start rzls process");
+                _logger.LogError("Failed to start Roslyn LS process");
                 return false;
             }
 
             _lspProcess.BeginErrorReadLine();
-            await Task.Delay(100, cancellationToken);
+
+            await Task.Delay(200, cancellationToken);
 
             if (_lspProcess.HasExited)
             {
-                _logger.LogError("rzls exited immediately with code: {ExitCode}", _lspProcess.ExitCode);
+                _logger.LogError("Roslyn LS process exited immediately with code: {ExitCode}", _lspProcess.ExitCode);
                 return false;
             }
 
@@ -104,10 +114,11 @@ public class RazorClient : LspProcessClient
             _readLoopTask = Task.Run(() => ReadLoopAsync(_readLoopCts.Token), _readLoopCts.Token);
 
             var rootUri = new Uri(projectRoot).ToString();
-            var initResult = await SendRequestAsync<JsonElement>("initialize", new
+            var initParams = new
             {
                 processId = Environment.ProcessId,
-                rootUri,
+                rootUri = rootUri,
+                rootPath = projectRoot,
                 capabilities = new
                 {
                     textDocument = new
@@ -115,30 +126,24 @@ public class RazorClient : LspProcessClient
                         publishDiagnostics = new { },
                         definition = new { dynamicRegistration = false },
                         synchronization = new { didSave = true }
-                    }
+                    },
+                    workspace = new { workspaceFolders = true }
+                },
+                workspaceFolders = new[]
+                {
+                    new { uri = rootUri, name = Path.GetFileName(projectRoot) }
                 }
-            }, cancellationToken);
+            };
 
+            var initResult = await SendRequestAsync<JsonElement>("initialize", initParams, cancellationToken);
             if (initResult.ValueKind == JsonValueKind.Undefined)
             {
-                _logger.LogError("Razor LSP initialize failed");
+                _logger.LogError("Roslyn LS initialization failed");
                 await CleanupFailedStartAsync();
                 return false;
             }
 
             await SendNotificationAsync("initialized", new { }, cancellationToken);
-
-            try
-            {
-                await SendRequestAsync<JsonElement>("razor/initialize",
-                    new { hostDocumentSyncVersion = 2 }, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Razor LSP failed to initialize — rzls may require a running Roslyn host.");
-                await CleanupFailedStartAsync();
-                return false;
-            }
 
             _isInitialized = true;
             return true;
@@ -220,7 +225,7 @@ public class RazorClient : LspProcessClient
                 TextDocument = new TextDocumentItem
                 {
                     Uri = uri,
-                    LanguageId = "razor",
+                    LanguageId = "aspnetcorerazor",
                     Version = 1,
                     Text = content
                 }
@@ -238,79 +243,30 @@ public class RazorClient : LspProcessClient
         }
     }
 
-    protected virtual async Task<string?> FindRazorServerAsync(CancellationToken cancellationToken)
+    protected virtual Task<RoslynServerInfo?> FindRoslynServerAsync(CancellationToken cancellationToken)
     {
-        if (await TryVersionAsync("rzls", cancellationToken))
-            return "rzls";
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var extRoot = Path.Combine(home, ".vscode", "extensions");
+        if (!Directory.Exists(extRoot))
+            return Task.FromResult<RoslynServerInfo?>(null);
 
-        var exeExtension = OperatingSystem.IsWindows() ? ".exe" : "";
+        var exeName = OperatingSystem.IsWindows()
+            ? "Microsoft.CodeAnalysis.LanguageServer.exe"
+            : "Microsoft.CodeAnalysis.LanguageServer";
 
-        try
+        var candidates = Directory.GetDirectories(extRoot, "ms-dotnettools.csharp-*")
+            .OrderByDescending(d => d);
+
+        foreach (var extDir in candidates)
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                Arguments = "--list-sdks",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var proc = Process.Start(psi);
-            if (proc == null) return null;
-            var output = await proc.StandardOutput.ReadToEndAsync(cancellationToken);
-            await proc.WaitForExitAsync(cancellationToken);
+            var lsPath = Path.Combine(extDir, ".roslyn", exeName);
+            var razorExtPath = Path.Combine(extDir, ".razorExtension",
+                "Microsoft.VisualStudioCode.RazorExtension.dll");
 
-            foreach (var (version, root) in ParseSdkList(output)
-                .OrderByDescending(s => Version.TryParse(s.Version, out var v) ? v : new Version(0, 0)))
-            {
-                var major = version.Split('.')[0];
-                var rzlsPath = Path.Combine(root, version, "DotnetTools", "dotnet-razor",
-                    "tools", $"net{major}", "any", $"rzls{exeExtension}");
-                if (await TryVersionAsync(rzlsPath, cancellationToken))
-                    return rzlsPath;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "SDK-relative rzls discovery failed");
+            if (File.Exists(lsPath) && File.Exists(razorExtPath))
+                return Task.FromResult<RoslynServerInfo?>(new RoslynServerInfo(lsPath, razorExtPath));
         }
 
-        return null;
-    }
-
-    private static IEnumerable<(string Version, string Root)> ParseSdkList(string output)
-    {
-        foreach (var line in output.Split('\n'))
-        {
-            var trimmed = line.Trim();
-            if (string.IsNullOrEmpty(trimmed)) continue;
-            var bracketIdx = trimmed.IndexOf('[');
-            if (bracketIdx < 0) continue;
-            var version = trimmed[..bracketIdx].Trim();
-            var root = trimmed[(bracketIdx + 1)..].TrimEnd(']', ' ', '\r');
-            if (!string.IsNullOrEmpty(version) && !string.IsNullOrEmpty(root))
-                yield return (version, root);
-        }
-    }
-
-    private static async Task<bool> TryVersionAsync(string path, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = path,
-                Arguments = "--version",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using var proc = Process.Start(psi);
-            if (proc == null) return false;
-            await proc.WaitForExitAsync(cancellationToken);
-            return proc.ExitCode == 0;
-        }
-        catch { return false; }
+        return Task.FromResult<RoslynServerInfo?>(null);
     }
 }

@@ -9,15 +9,15 @@ namespace CSharpLspMcp.Tests;
 
 public class RazorClientTests
 {
-    // Test subclass that bypasses real rzls discovery.
+    // Test subclass that bypasses real Roslyn server discovery.
     private class RazorClientWithoutDiscovery(ILogger<RazorClient> logger) : RazorClient(logger)
     {
-        protected override Task<string?> FindRazorServerAsync(CancellationToken cancellationToken)
-            => Task.FromResult<string?>(null);
+        protected override Task<RoslynServerInfo?> FindRoslynServerAsync(CancellationToken cancellationToken)
+            => Task.FromResult<RoslynServerInfo?>(null);
     }
 
     [Fact]
-    public async Task StartAsync_WhenRzlsNotFound_ReturnsFalse()
+    public async Task StartAsync_WhenRoslynServerNotFound_ReturnsFalse()
     {
         var logger = LoggerFactory.Create(_ => { }).CreateLogger<RazorClient>();
         var client = new RazorClientWithoutDiscovery(logger);
