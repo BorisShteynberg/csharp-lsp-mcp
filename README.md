@@ -8,92 +8,98 @@
 [![MCP](https://img.shields.io/badge/MCP-0.5.0-blue)](https://modelcontextprotocol.io/)
 [![GitHub release](https://img.shields.io/github/v/release/HYMMA/csharp-lsp-mcp)](https://github.com/HYMMA/csharp-lsp-mcp/releases)
 
-An MCP (Model Context Protocol) server that provides C# and XAML language intelligence for AI assistants like Claude. It bridges the gap between LLMs and .NET development by exposing IntelliSense, diagnostics, and code analysis through the standardized MCP protocol.
+An MCP (Model Context Protocol) server that provides C#, Razor, and XAML language intelligence for AI assistants like Claude. It bridges the gap between LLMs and .NET development by exposing IntelliSense, diagnostics, and code analysis through the standardized MCP protocol.
 
 ## Features
 
 ### C# Language Intelligence (via csharp-ls)
-- **Diagnostics** - Get compiler errors and warnings in real-time
-- **Hover Information** - View type information and documentation
-- **IntelliSense Completions** - Get context-aware code suggestions
-- **Go to Definition** - Navigate to symbol definitions
-- **Find References** - Locate all usages of a symbol
-- **Document Symbols** - List all symbols in a file
-- **Code Actions** - Access quick fixes and refactorings
-- **Rename Preview** - Preview symbol renames across the workspace
-- **Stop/Restart** - Stop the LSP server to release file locks before rebuilding
+- **Diagnostics** — Compiler errors and warnings in real-time
+- **Hover Information** — Type information and documentation
+- **IntelliSense Completions** — Context-aware code suggestions
+- **Go to Definition** — Navigate to symbol definitions
+- **Find References** — Locate all usages of a symbol
+- **Document Symbols** — List all symbols in a file
+- **Code Actions** — Quick fixes and refactorings
+- **Rename Preview** — Preview symbol renames across the workspace
+- **Stop/Restart** — Release file locks before rebuilding
 
-### XAML Analysis (built-in)
-- **Validation** - Check XAML for errors and issues
-- **Binding Analysis** - Extract and analyze data bindings
-- **Resource Inspection** - List and verify resource references
-- **Name Discovery** - Find all x:Name declarations
-- **Structure Visualization** - View element tree hierarchy
-- **Binding Error Detection** - Identify binding problems
-- **ViewModel Generation** - Generate ViewModels from bindings
+### Razor Diagnostics (via Roslyn Language Server)
+- **Diagnostics** — Compiler errors and warnings in `.cshtml` files
+- **Go to Definition** — Navigate from Razor markup to C# definitions
+
+### XAML Analysis (built-in, no external dependency)
+- **Validation** — Check XAML for errors and issues
+- **Binding Analysis** — Extract and analyze data bindings
+- **Resource Inspection** — List and verify resource references
+- **Name Discovery** — Find all x:Name declarations
+- **Structure Visualization** — View element tree hierarchy
+- **Binding Error Detection** — Identify binding problems
+- **ViewModel Generation** — Generate ViewModels from bindings
 
 ## Prerequisites
 
 1. **.NET 8.0 SDK** or later
-2. **csharp-ls** - The C# Language Server
 
-Install csharp-ls globally:
-```bash
-dotnet tool install --global csharp-ls
-```
+2. **csharp-ls** — for C# tools:
+   ```bash
+   dotnet tool install --global csharp-ls
+   ```
+
+3. **VS Code C# extension** (`ms-dotnettools.csharp`) — for Razor tools. Install it in VS Code or download it manually. The extension ships `Microsoft.CodeAnalysis.LanguageServer.exe` and the Razor extension DLL that this server uses.
 
 ## Installation
+
+### As a .NET global tool
+
+```bash
+dotnet tool install --global csharp-lsp-mcp
+```
 
 ### From Source
 
 ```bash
 git clone https://github.com/HYMMA/csharp-lsp-mcp.git
-cd csharp-lsp-mcp/csharp-lsp-mcp/src/CSharpLspMcp
+cd csharp-lsp-mcp/csharp-lsp-mcp
 dotnet build -c Release
 ```
 
-### From NuGet (coming soon)
+## Adding to a Claude Code Project
 
-```bash
-dotnet tool install --global CSharpLspMcp
+### Automated (PowerShell — Windows)
+
+Run the included script from the repo root:
+
+```powershell
+# Add to the current directory's project
+.\add-to-project.ps1
+
+# Add to a specific project
+.\add-to-project.ps1 C:\path\to\your\project
 ```
 
-## Configuration
+The script edits `~/.claude.json` to register the server for that project, using the global tool if installed or the local debug build otherwise.
 
-### Claude Code
+### Manual
 
-Add to your `~/.claude.json`:
+Add the following to your project's entry in `~/.claude.json` (under `projects.<your-path>.mcpServers`):
 
 ```json
 {
-  "mcpServers": {
-    "csharp": {
-      "command": "path/to/csharp-lsp-mcp.exe"
-    }
-  }
-}
-```
-
-Or if installed as a global tool:
-
-```json
-{
-  "mcpServers": {
-    "csharp": {
-      "command": "csharp-lsp-mcp"
-    }
+  "csharp-lsp-mcp": {
+    "type": "stdio",
+    "command": "csharp-lsp-mcp",
+    "args": [],
+    "env": {}
   }
 }
 ```
 
 ### Claude Desktop
 
-Add to your Claude Desktop configuration:
-
 ```json
 {
   "mcpServers": {
-    "csharp": {
+    "csharp-lsp-mcp": {
       "command": "csharp-lsp-mcp",
       "args": []
     }
@@ -103,54 +109,42 @@ Add to your Claude Desktop configuration:
 
 ## Usage
 
-Once configured, the MCP server provides the following tools to your AI assistant:
-
 ### Setting Up the Workspace
 
-Before using C# tools, set the workspace directory:
+Before using C# or Razor tools, set the workspace directory:
 
 ```
 Use csharp_set_workspace with path: "C:/path/to/your/solution"
 ```
 
+This starts `csharp-ls` for C# tooling and kicks off the Roslyn Language Server in the background for Razor support, so both are ready by the time you need them.
+
 ### Stopping the LSP for Rebuilds
 
-The LSP server holds file locks on project DLLs. To rebuild your project, stop the server first:
+The LSP server holds file locks on project DLLs. Stop it before rebuilding:
 
 ```
 Stop the C# LSP server so I can rebuild
 ```
 
-After rebuilding, call `csharp_set_workspace` again to restart it. Switching workspaces via `csharp_set_workspace` automatically restarts the server.
+After rebuilding, call `csharp_set_workspace` again to restart.
 
 ### Example Interactions
 
-**Get diagnostics for a file:**
 ```
 Check for errors in Program.cs
-```
-
-**Get type information:**
-```
 What type is the variable at line 15, column 10 in MyClass.cs?
-```
-
-**Find all references:**
-```
 Find all usages of the GetCustomer method
-```
-
-**Analyze XAML bindings:**
-```
 Show me all data bindings in MainWindow.xaml
+Get diagnostics for Pages/Index.cshtml
 ```
 
 ## Available Tools
 
 | Tool | Description |
 |------|-------------|
-| `csharp_set_workspace` | Set the solution/project directory (restarts LSP if workspace changes) |
-| `csharp_stop` | Stop the LSP server to release file locks for rebuilding |
+| `csharp_set_workspace` | Set the solution/project directory |
+| `csharp_stop` | Stop the C# LSP server to release file locks |
 | `csharp_diagnostics` | Get compiler errors and warnings |
 | `csharp_hover` | Get type info at a position |
 | `csharp_completions` | Get IntelliSense completions |
@@ -159,6 +153,9 @@ Show me all data bindings in MainWindow.xaml
 | `csharp_symbols` | Get document symbols |
 | `csharp_code_actions` | Get available code actions |
 | `csharp_rename` | Preview symbol rename |
+| `razor_diagnostics` | Get compiler diagnostics for a `.cshtml` file |
+| `razor_definition` | Go to definition from a Razor file position |
+| `razor_stop` | Stop the Razor language server to release file locks |
 | `xaml_validate` | Validate XAML for errors |
 | `xaml_bindings` | Extract data bindings |
 | `xaml_resources` | List resource references |
@@ -186,37 +183,35 @@ ENVIRONMENT VARIABLES:
 ```
 ┌─────────────────┐     MCP Protocol      ┌──────────────────┐
 │  Claude / LLM   │◄────────────────────►│  csharp-lsp-mcp  │
-└─────────────────┘                       └────────┬─────────┘
-                                                   │
-                                    ┌──────────────┴──────────────┐
-                                    │                             │
-                              ┌─────▼─────┐               ┌───────▼───────┐
-                              │ csharp-ls │               │  XAML Parser  │
-                              │   (LSP)   │               │   (built-in)  │
-                              └─────┬─────┘               └───────────────┘
-                                    │
-                              ┌─────▼─────┐
-                              │  Roslyn   │
-                              │ Compiler  │
-                              └───────────┘
+└─────────────────┘                       └──┬───────────┬───┘
+                                             │           │
+                              ┌──────────────┘           └──────────────┐
+                              │                                          │
+                        ┌─────▼─────┐    ┌──────────────────┐   ┌──────▼──────┐
+                        │ csharp-ls │    │  Roslyn Language  │   │    XAML     │
+                        │   (LSP)   │    │  Server + Razor   │   │   Parser   │
+                        └─────┬─────┘    └──────────────────┘   └─────────────┘
+                              │
+                        ┌─────▼─────┐
+                        │  Roslyn   │
+                        │ Compiler  │
+                        └───────────┘
 ```
 
 ## Building from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/HYMMA/csharp-lsp-mcp.git
-cd csharp-lsp-mcp
+cd csharp-lsp-mcp/csharp-lsp-mcp
 
 # Build
-cd csharp-lsp-mcp/src/CSharpLspMcp
-dotnet build -c Release
+dotnet build
 
-# Run tests (if available)
+# Run tests
 dotnet test
 
-# Create a release build
-dotnet publish -c Release -o ./publish
+# Pack as NuGet tool
+dotnet pack src/CSharpLspMcp -c Release
 ```
 
 ## Contributing
@@ -229,15 +224,15 @@ See [CHANGELOG.md](CHANGELOG.md) for a history of changes.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- [Model Context Protocol](https://modelcontextprotocol.io/) - The protocol specification
-- [csharp-ls](https://github.com/razzmatazz/csharp-language-server) - The C# Language Server
-- [Microsoft MCP C# SDK](https://github.com/modelcontextprotocol/csharp-sdk) - The official C# SDK for MCP
+- [Model Context Protocol](https://modelcontextprotocol.io/) — The protocol specification
+- [csharp-ls](https://github.com/razzmatazz/csharp-language-server) — The C# Language Server
+- [Microsoft MCP C# SDK](https://github.com/modelcontextprotocol/csharp-sdk) — The official C# SDK for MCP
 
 ## Related Projects
 
-- [Claude Code](https://claude.ai/code) - Anthropic's CLI for Claude
-- [MCP Servers](https://github.com/modelcontextprotocol/servers) - Official MCP server implementations
+- [Claude Code](https://claude.ai/code) — Anthropic's CLI for Claude
+- [MCP Servers](https://github.com/modelcontextprotocol/servers) — Official MCP server implementations
