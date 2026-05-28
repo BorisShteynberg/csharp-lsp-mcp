@@ -13,6 +13,8 @@ public class LspClient : LspProcessClient
 
     public event Action<PublishDiagnosticsParams>? DiagnosticsReceived;
 
+    public string? WorkspacePath => _filteredWorkspacePath;
+
     public LspClient(ILogger<LspClient> logger, SolutionFilter solutionFilter) : base(logger)
     {
         _solutionFilter = solutionFilter;

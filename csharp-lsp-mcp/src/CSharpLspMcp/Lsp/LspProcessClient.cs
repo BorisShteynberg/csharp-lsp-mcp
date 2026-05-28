@@ -128,7 +128,7 @@ public abstract class LspProcessClient : IAsyncDisposable
             _logger.LogDebug("SendRequestAsync: Request sent, waiting for response...");
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            cts.CancelAfter(TimeSpan.FromSeconds(120));
+            cts.CancelAfter(TimeSpan.FromMinutes(5));
 
             var result = await tcs.Task.WaitAsync(cts.Token);
 
@@ -234,9 +234,44 @@ public abstract class LspProcessClient : IAsyncDisposable
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
-            if (root.TryGetProperty("id", out var idElement))
+            var hasId = root.TryGetProperty("id", out var idElement);
+            var hasMethod = root.TryGetProperty("method", out var methodElement);
+
+            if (hasId && hasMethod)
             {
-                var id = idElement.GetInt32();
+                // Server-initiated request (e.g. client/registerCapability, workspace/configuration).
+                // Send back a null result so the server is not blocked waiting for a response.
+                var rawId = idElement.Clone();
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var method = methodElement.GetString() ?? "unknown";
+                        _logger.LogDebug("Server request received: {Method} — responding null", method);
+                        var response = $"{{\"jsonrpc\":\"2.0\",\"id\":{rawId.GetRawText()},\"result\":null}}";
+                        var bytes = Encoding.UTF8.GetBytes($"Content-Length: {Encoding.UTF8.GetByteCount(response)}\r\n\r\n{response}");
+                        await _writeLock.WaitAsync();
+                        try
+                        {
+                            if (_lspProcess?.StandardInput?.BaseStream != null)
+                            {
+                                await _lspProcess.StandardInput.BaseStream.WriteAsync(bytes);
+                                await _lspProcess.StandardInput.BaseStream.FlushAsync();
+                            }
+                        }
+                        finally { _writeLock.Release(); }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to respond to server request");
+                    }
+                });
+                return;
+            }
+
+            if (hasId)
+            {
+                if (!idElement.TryGetInt32(out var id)) return;
                 if (_pendingRequests.TryGetValue(id, out var tcs))
                 {
                     if (root.TryGetProperty("error", out var error))
@@ -255,7 +290,7 @@ public abstract class LspProcessClient : IAsyncDisposable
                     }
                 }
             }
-            else if (root.TryGetProperty("method", out var methodElement))
+            else if (hasMethod)
             {
                 var method = methodElement.GetString();
                 if (method != null && root.TryGetProperty("params", out var @params))

@@ -79,6 +79,7 @@ public class RazorClient : LspProcessClient
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
+            startInfo.ArgumentList.Add("--stdio");
             startInfo.ArgumentList.Add("--extension");
             startInfo.ArgumentList.Add(serverInfo.RazorExtPath);
             startInfo.ArgumentList.Add("--logLevel");
@@ -86,19 +87,33 @@ public class RazorClient : LspProcessClient
             startInfo.ArgumentList.Add("--clientProcessId");
             startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
 
+            var stderrLogPath = Path.Combine(Path.GetTempPath(), "roslyn-ls-stderr.log");
+            File.WriteAllText(stderrLogPath, $"[{Environment.ProcessId}] Starting Roslyn LS: {serverInfo.LsPath}\n");
+
             _lspProcess = new Process { StartInfo = startInfo };
+            _lspProcess.EnableRaisingEvents = true;
             _lspProcess.ErrorDataReceived += (_, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data))
+                {
                     _logger.LogDebug("Roslyn LS stderr: {Message}", e.Data);
+                    File.AppendAllText(stderrLogPath, $"[stderr] {e.Data}\n");
+                }
+            };
+            _lspProcess.Exited += (_, _) =>
+            {
+                _logger.LogWarning("Roslyn LS process exited with code {ExitCode}", _lspProcess?.ExitCode);
+                File.AppendAllText(stderrLogPath, $"[exit] code={_lspProcess?.ExitCode}\n");
             };
 
             if (!_lspProcess.Start())
             {
                 _logger.LogError("Failed to start Roslyn LS process");
+                File.AppendAllText(stderrLogPath, "[error] Start() returned false\n");
                 return false;
             }
 
+            File.AppendAllText(stderrLogPath, $"[info] Process started, PID={_lspProcess.Id}\n");
             _lspProcess.BeginErrorReadLine();
 
             await Task.Delay(200, cancellationToken);
@@ -106,8 +121,11 @@ public class RazorClient : LspProcessClient
             if (_lspProcess.HasExited)
             {
                 _logger.LogError("Roslyn LS process exited immediately with code: {ExitCode}", _lspProcess.ExitCode);
+                File.AppendAllText(stderrLogPath, $"[error] Exited immediately, code={_lspProcess.ExitCode}\n");
                 return false;
             }
+
+            File.AppendAllText(stderrLogPath, "[info] Process alive after 200ms, sending initialize...\n");
 
             _outputStream = _lspProcess.StandardOutput.BaseStream;
             _readLoopCts = new CancellationTokenSource();
@@ -139,13 +157,16 @@ public class RazorClient : LspProcessClient
             if (initResult.ValueKind == JsonValueKind.Undefined)
             {
                 _logger.LogError("Roslyn LS initialization failed");
+                File.AppendAllText(stderrLogPath, "[error] initialize returned undefined\n");
                 await CleanupFailedStartAsync();
                 return false;
             }
 
+            File.AppendAllText(stderrLogPath, "[info] initialize succeeded, sending initialized notification\n");
             await SendNotificationAsync("initialized", new { }, cancellationToken);
 
             _isInitialized = true;
+            File.AppendAllText(stderrLogPath, "[info] RazorClient fully initialized\n");
             return true;
         }
         catch

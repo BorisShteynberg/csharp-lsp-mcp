@@ -7,7 +7,7 @@ using ModelContextProtocol.Server;
 namespace CSharpLspMcp.Tools;
 
 [McpServerToolType]
-public class RazorTools(RazorClient razorClient, ILogger<RazorTools> logger)
+public class RazorTools(RazorClient razorClient, LspClient lspClient, ILogger<RazorTools> logger)
 {
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromMinutes(3);
 
@@ -91,10 +91,11 @@ public class RazorTools(RazorClient razorClient, ILogger<RazorTools> logger)
     private async Task<bool> EnsureStartedAsync(string filePath, CancellationToken ct)
     {
         if (razorClient.IsRunning) return true;
-        var projectRoot = FindProjectRoot(filePath);
+        // Prefer the workspace already loaded by LspClient to avoid a redundant solution scan.
+        var projectRoot = lspClient.WorkspacePath ?? FindProjectRoot(filePath);
         if (projectRoot == null)
         {
-            logger.LogWarning("No .csproj found for {Path}", filePath);
+            logger.LogWarning("No workspace or .csproj found for {Path}", filePath);
             return false;
         }
         return await razorClient.StartAsync(projectRoot, ct);

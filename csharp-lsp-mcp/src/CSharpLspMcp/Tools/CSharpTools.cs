@@ -15,6 +15,7 @@ public class CSharpTools
 {
     private readonly ILogger<CSharpTools> _logger;
     private readonly LspClient _lspClient;
+    private readonly RazorClient _razorClient;
     private readonly Dictionary<string, DocumentState> _openDocuments = new();
     private string? _workspacePath;
 
@@ -22,10 +23,11 @@ public class CSharpTools
     // This prevents MCP request cancellation from killing LSP initialization
     private static readonly TimeSpan LspOperationTimeout = TimeSpan.FromMinutes(3);
 
-    public CSharpTools(ILogger<CSharpTools> logger, LspClient lspClient)
+    public CSharpTools(ILogger<CSharpTools> logger, LspClient lspClient, RazorClient razorClient)
     {
         _logger = logger;
         _lspClient = lspClient;
+        _razorClient = razorClient;
     }
 
     /// <summary>
@@ -83,6 +85,10 @@ public class CSharpTools
 
             if (!started)
                 return "Error: Failed to start LSP server. Make sure csharp-ls is installed: dotnet tool install --global csharp-ls";
+
+            // Start Razor LSP in the background so it's ready by the time razor_diagnostics is called.
+            var razorWorkspace = _lspClient.WorkspacePath ?? path;
+            _ = _razorClient.StartAsync(razorWorkspace, CancellationToken.None);
 
             return $"Workspace set to: {path}\nLSP server started successfully.";
         }, cancellationToken);
