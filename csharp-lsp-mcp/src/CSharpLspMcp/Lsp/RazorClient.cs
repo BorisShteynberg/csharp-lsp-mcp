@@ -108,7 +108,15 @@ public class RazorClient : LspProcessClient
             {
                 processId = Environment.ProcessId,
                 rootUri,
-                capabilities = new { textDocument = new { publishDiagnostics = new { } } }
+                capabilities = new
+                {
+                    textDocument = new
+                    {
+                        publishDiagnostics = new { },
+                        definition = new { dynamicRegistration = false },
+                        synchronization = new { didSave = true }
+                    }
+                }
             }, cancellationToken);
 
             if (initResult.ValueKind == JsonValueKind.Undefined)
@@ -160,6 +168,8 @@ public class RazorClient : LspProcessClient
     {
         var uri = new Uri(filePath).ToString();
         var tcs = new TaskCompletionSource<PublishDiagnosticsParams?>();
+        if (_diagnosticsWaiters.TryRemove(uri, out var existingTcs))
+            existingTcs.TrySetResult(null);
         _diagnosticsWaiters[uri] = tcs;
 
         await EnsureDocumentSyncedAsync(filePath, content, cancellationToken);
@@ -219,13 +229,12 @@ public class RazorClient : LspProcessClient
         }
         else
         {
-            var newVersion = version + 1;
+            var newVersion = _openDocuments.AddOrUpdate(filePath, 1, (_, v) => v + 1);
             await SendNotificationAsync("textDocument/didChange", new DidChangeTextDocumentParams
             {
                 TextDocument = new VersionedTextDocumentIdentifier { Uri = uri, Version = newVersion },
                 ContentChanges = [new TextDocumentContentChangeEvent { Text = content }]
             }, cancellationToken);
-            _openDocuments[filePath] = newVersion;
         }
     }
 
