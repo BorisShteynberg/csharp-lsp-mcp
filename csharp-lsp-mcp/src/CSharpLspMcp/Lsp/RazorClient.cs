@@ -255,7 +255,16 @@ public class RazorClient : LspProcessClient
             : "Microsoft.CodeAnalysis.LanguageServer";
 
         var candidates = Directory.GetDirectories(extRoot, "ms-dotnettools.csharp-*")
-            .OrderByDescending(d => d);
+            .OrderByDescending(d =>
+            {
+                // Extract semantic version from "ms-dotnettools.csharp-2.140.8-win32-x64"
+                var name = Path.GetFileName(d);
+                var start = "ms-dotnettools.csharp-".Length;
+                if (start >= name.Length) return new Version(0, 0);
+                var rest = name.Substring(start);
+                var versionPart = rest.Split('-')[0];
+                return Version.TryParse(versionPart, out var v) ? v : new Version(0, 0);
+            });
 
         foreach (var extDir in candidates)
         {
