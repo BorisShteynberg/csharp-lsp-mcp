@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
 [![MCP](https://img.shields.io/badge/MCP-0.5.0-blue)](https://modelcontextprotocol.io/)
-[![GitHub release](https://img.shields.io/github/v/release/HYMMA/csharp-lsp-mcp)](https://github.com/BorisShteynberg/csharp-lsp-mcp/releases)
+[![GitHub release](https://img.shields.io/github/v/release/BorisShteynberg/csharp-lsp-mcp)](https://github.com/BorisShteynberg/csharp-lsp-mcp/releases)
 
 An MCP (Model Context Protocol) server that provides C#, Razor, and XAML language intelligence for AI assistants like Claude. It bridges the gap between LLMs and .NET development by exposing IntelliSense, diagnostics, and code analysis through the standardized MCP protocol.
 
